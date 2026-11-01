@@ -1,0 +1,16 @@
+/vendor/
+/node_modules/
+/.env
+/.env.testing
+/.bootstrap/
+/public/build/
+/public/hot
+/bootstrap/ssr/
+/bootstrap/cache/*.php
+/storage/**/*.log
+/storage/framework/views/*.php
+/test-results/
+/playwright-report/
+/.phpunit.cache/
+/.cache/
+/.changuito-suite-*/

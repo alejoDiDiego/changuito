@@ -1,0 +1,68 @@
+name: Bootstrap quality gates
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres-test:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_DB: changuito_test
+          POSTGRES_USER: changuito_test
+          POSTGRES_PASSWORD: local-tests-only
+        ports: ['55433:5432']
+        options: >-
+          --health-cmd "pg_isready -U changuito_test -d changuito_test"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5.10'
+          extensions: pdo_pgsql, mbstring, dom, xml, intl, zip
+          tools: composer:2.10.3
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.15.0'
+          cache: npm
+      - name: Explicit dependencies and isolated test preparation
+        run: |
+          composer install --no-interaction --prefer-dist
+          npm install --prefix .cache/npm-runtime --save-exact --ignore-scripts --no-fund --no-audit npm@12.0.2
+          export PATH="$PWD/.cache/npm-runtime/node_modules/.bin:$PATH"
+          echo "$PWD/.cache/npm-runtime/node_modules/.bin" >> "$GITHUB_PATH"
+          npm ci
+          cp .env.testing.example .env.testing
+          PLAYWRIGHT_BROWSERS_PATH="$PWD/.cache/ms-playwright" PLAYWRIGHT_SKIP_BROWSER_GC=1 npx --no-install playwright install --with-deps chromium
+          APP_ENV=testing php scripts/prepare-test.php
+      - name: Same complete fail-closed entrypoint
+        run: node scripts/verify-harness.mjs --application
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: bootstrap-browser-failure
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 3
+  compose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Explicit Compose preparation and same gates
+        run: |
+          cp .env.testing.example .env.testing
+          docker compose up -d --wait postgres-test
+          docker compose build quality
+          docker compose run --rm quality composer install --no-interaction --prefer-dist
+          docker compose run --rm quality npm ci
+          docker compose run --rm quality php scripts/prepare-test.php
+          docker compose run --rm quality node scripts/verify-harness.mjs --application
+      - name: Stop owned services without deleting volumes
+        if: always()
+        run: docker compose down --remove-orphans

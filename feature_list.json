@@ -1,0 +1,1334 @@
+{
+  "schema_version": 1,
+  "notes": "Dependencias mínimas de arranque propuestas, no un plan exhaustivo. Refinar una sola feature antes de activarla. P1/P2 requieren solicitud explícita. F-061/F-062/F-063 son garantías transversales desde el primer cambio.",
+  "features": [
+    {
+      "id": "SETUP-001",
+      "name": "Bootstrap reproducible y gates de calidad",
+      "priority": "P0",
+      "source": "docs/architecture/ARCHITECTURE.md",
+      "description": "Preparar el stack acordado sin implementar todo el MVP.",
+      "dependencies": [],
+      "status": "in-progress",
+      "acceptance": [
+        "Validar compatibilidad Laravel/PHP, Inertia/React y fijar dependencias en lockfiles.",
+        "Documentar y comprobar inicio nativo y Docker Compose con PostgreSQL aislado para tests.",
+        "Implementar comandos reales de Pest, arquitectura, Pint, PHPStan/Larastan, ESLint, TypeScript, build SSR y Playwright y ejecutarlos en GitHub Actions.",
+        "Reemplazar el bloqueo --application del verificador por un entrypoint que ejecute todos los gates reales y falle si falta alguno; sin instalar dependencias ni migrar datos reales implícitamente."
+      ],
+      "evidence": [
+        {
+          "date": "2026-11-01",
+          "environment": "Windows 11 / PowerShell; Docker Compose project changuito-bootstrap; Checker independiente",
+          "command": "docker compose down --remove-orphans; docker ps -a --filter label=com.docker.compose.project=changuito-bootstrap; docker volume ls; Get-NetTCPConnection -LocalPort 18080,8011,13714,5173,55432,55433,8025,1025,8000",
+          "result": "Cierre exit0 sin -v ni prune. Se conservaron los 6 volúmenes propios (dev-db, test-db, app-vendor, node-deps, quality-node, quality-vendor); sin contenedores ni red propios; puertos 18080/8011/13714/5173/55432/55433/8025/1025/8000 libres; public/hot y bootstrap/cache/config.php ausentes; jobs propios recogidos. Sin cambios en app/resources/config/routes/tests/scripts/docker/.github; solo se regeneraron artefactos de build y logs de verificación."
+        },
+        {
+          "date": "2026-11-01",
+          "environment": "Windows / PowerShell; repositorio sin .git; Checker independiente",
+          "command": "Inspección de .github/workflows/quality.yml, .git, documento de semillas retirado y evidencia de corridas remotas",
+          "result": "El workflow define jobs native y compose, PostgreSQL de test, mismo entrypoint, npm12 local y cache Playwright local, pero NO se ejecutó en GitHub Actions: no existe .git, remoto ni credenciales. documento de semillas retirado original sigue ausente. Por tanto la aceptación 3 (ejecutar los gates en GitHub Actions) no está verificada y SETUP-001 no puede marcarse done. No se inicializó Git ni se creó commit."
+        },
+        {
+          "date": "2026-11-01",
+          "environment": "Windows / PowerShell; PostgreSQL 18.6 test dedicado 127.0.0.1:55433; Node 24.15.0",
+          "command": "DB_DATABASE=changuito_dev node scripts/verify-harness.mjs --application; APP_ENV=testing DB_DATABASE=changuito_dev DB_HOST=invalid.invalid php scripts/prepare-test.php; APP_ENV=testing DB_URL=postgres://*** php scripts/prepare-test.php; node --test tests/runner/*.test.mjs",
+          "result": "Las tres variantes inseguras terminaron 1 antes de ejecutar gates, conectar o migrar: \"Unsafe test environment\" y \"Unsafe test database ... DB_URL forbidden\". La DB test conservó 1 migración y 4 tablas. Runner 5/5: rechaza catálogo faltante/duplicado, suite vacía, ejecutable ausente, exit 7 y fallos reales de shims composer/npm; application-gates no contiene install ni migrate."
+        },
+        {
+          "date": "2026-11-01",
+          "environment": "Docker Compose quality / Debian bookworm; PHP 8.5.10, Composer 2.10.3, Node 24.15.0/npm 12.0.2, PostgreSQL 18.6 test",
+          "command": "docker compose run --rm quality sh -lc 'php scripts/prepare-test.php && node scripts/verify-harness.mjs --application'",
+          "result": "Preparación explícita exit0 (\"Nothing to migrate\"). 14 gates ejecutados; exit1 SOLO por harness ENOENT del original de semillas. 13 gates técnicos exit0: runner 5; composer validate/platform; Pest Unit 3/6, Feature 2/16 PostgreSQL real, Architecture 2/13; Pint 28; Larastan 8; ESLint 10/TS; builds cliente 591/SSR; Chromium 2. DB test sin cambios (1 migración/4 tablas). Log .cache/checker-verification-compose.log."
+        },
+        {
+          "date": "2026-11-01",
+          "environment": "Docker Compose / loopback 18080; PHP-FPM, nginx 1.28.0, Node SSR, Mailpit, PostgreSQL 18.6",
+          "command": "docker compose up -d --wait --wait-timeout 180 app web worker ssr mailpit; fetch http://127.0.0.1:18080/ /bootstrap/check /up; fetch http://127.0.0.1:8025/",
+          "result": "up exit0; app/web/worker/ssr/mailpit y ambos PostgreSQL activos/saludables. / y /bootstrap/check HTTP200 con SSR real (h1 Changuito, \"Entorno técnico disponible\", Pantalla inicio/verificación) y consulta PostgreSQL; /up 200; Mailpit 200. Test DB aislada en 55433/volumen test-db y dev en 55432/dev-db; 8080 no se usó. Logs web/app/ssr sin errores."
+        },
+        {
+          "date": "2026-11-01",
+          "environment": "Windows nativo; PHP 8.5.10, Node 24.15.0, PostgreSQL 18.6 dedicado en 55432",
+          "command": "docker compose up -d --wait postgres; php artisan serve --host=127.0.0.1 --port=8000 --no-reload; node bootstrap/ssr/ssr.js; fetch / y /bootstrap/check",
+          "result": "postgres dev dedicado healthy; /up 200; / y /bootstrap/check HTTP200 con SSR real (h1/texto/Pantalla inicio y verificación) y SELECT1 efectivo contra changuito_dev/changuito_dev. Procesos propios detenidos con taskkill /T y puertos 8000/13714 libres. Logs .cache/checker-native-app.* y .cache/checker-native-ssr.*."
+        },
+        {
+          "date": "2026-11-01",
+          "environment": "Windows nativo; PHP 8.5.10/Composer 2.10.3/Node 24.15.0/npm 12.0.2/PostgreSQL 18.6 test dedicado",
+          "command": "APP_ENV=testing php scripts/prepare-test.php; node scripts/verify-harness.mjs --application",
+          "result": "Preparación exit0 (\"Nothing to migrate\"). 14 gates ejecutados; exit1 SOLO harness ENOENT. 13 técnicos exit0: runner 5; composer validate/platform; Pest Unit 3/6, Feature 2/16 PostgreSQL, Architecture 2/13; Pint 28; Larastan 8; ESLint 10/TS; build cliente 591/SSR; Playwright Chromium 2 (SSR sin JS, hidratación sin console errors, móvil/teclado/navegación DB sin recarga). DB test sin cambios. Log .cache/checker-verification-native.log. No aceptación por el original ausente."
+        },
+        {
+          "date": "2026-11-01",
+          "environment": "Windows nativo; PHP 8.5.10/Composer 2.10.3/Node 24.15.0/npm 12.0.2",
+          "command": "composer validate --strict; composer check-platform-reqs; composer install --dry-run --no-scripts; npm ls --depth=0; npm ci --dry-run",
+          "result": "Todos exit0. Laravel 13.39.0/PHP 8.5.10; Inertia PHP 3.6.0; React/ReactDOM 19.3.1 e Inertia JS 3.10.0; Vite 8.3.5, TypeScript 5.9.3, Tailwind 4.3.3, ESLint 10.14.0. Locks coherentes: \"Nothing to install, update or remove\" y \"up to date\". PHP 8.3 no es compatible con el lock (Symfony 8.1/Pest 4 exigen >=8.4.1/8.5), según docs/verification.md."
+        },
+        {
+          "date": "2026-11-01",
+          "environment": "Windows / Docker Compose; cierre Builder único",
+          "command": "docker compose down --remove-orphans; node --check scripts/verify-harness.mjs",
+          "result": "exit0; todos los servicios propios detenidos/retirados, sin -v ni prune, volúmenes DB/dependencias conservados. Puertos18080/8011/13714/5173/55432/55433/8025/1025 libres y hot ausente. Parser tracker confirmó66 entradas: SETUP-001 in-progress,65 not-started, ninguna done. Especificaciones de producto/dominio/arquitectura conservadas; harness y estado actualizados; staging/generador propios retirados con ruta verificada. Checker será próximo único escritor de estado; no se declara done/passing."
+        },
+        {
+          "date": "2026-11-01",
+          "environment": "Docker Compose / Debian bookworm; PHP8.5.10/Composer2.10.3/Node24.15.0/npm12.0.2/PostgreSQL18.6",
+          "command": "docker compose run --rm quality node scripts/verify-harness.mjs --application",
+          "result": "Build final quality e instalaciones explícitas composer install/npm ci y preparación test terminaron0; npm confirmó12.0.2, Nothing to migrate. Entrypoint ejecutó14 gates: exit1 SOLO harness ENOENT /app/documento de semillas retirado. Los13 gates técnicos terminaron0: runner5; Composer validate/platform; Pest Unit3/6 assertions, Feature2/16, Architecture2/13; Pint28 archivos; Larastan8; ESLint10/TS; build cliente/SSR; Chromium2 con SSR noJS, hidratación sin errores y navegación real a PostgreSQL. Log .cache/verification-compose.log. Actions remoto no ejecutado; no aceptación integral."
+        },
+        {
+          "date": "2026-11-01",
+          "environment": "Compose principal en loopback18080; Vite5173; Windows host",
+          "command": "docker compose up -d --wait --wait-timeout 180 --no-build app web worker ssr mailpit; node scripts/smoke-vite.mjs",
+          "result": "App/worker con vendor Linux propio, DB dev nueva y migración jobs explícita. HTML real SSR de / y /bootstrap/check HTTP200 con h1/texto; Mailpit200. Puerto8080 ajeno no alterado: WEB_PORT default18080 probado. Health3s inicial falló con HTTP200 medido3912ms; timeout10s y vendor separado, up final0. RED CORS real: smoke-vite exit1 por origen5173 vs8000 esperado; fix solo loopback y GREEN exit0 para cliente/app.tsx desde8000/18080, origen externo no permitido. Vite detenido y hot propio retirado con ruta verificada; lint/typecheck rerun0. Refactor centralizó resolución client/SSR; gates completos rerun en ambos modos."
+        },
+        {
+          "date": "2026-11-01",
+          "environment": "Windows nativo; PHP8.5.10/Node24.15.0/npm12.0.2; PostgreSQL18.6 dedicado",
+          "command": "npm ci --no-fund --no-audit; node scripts/verify-harness.mjs --application; npm run lint; npm run typecheck; npm run test:e2e",
+          "result": "Entrypoint final: 14 gates ejecutados, exit1 únicamente harness (original de semillas ausente). 13 gates técnicos exit0: runner5, Composer validate/platform, Pest Unit3/6 assertions, Feature2/16, Architecture2/13, Pint28 archivos, Larastan8, ESLint10, TS5.9, cliente y SSR compilados, Chromium2. Rerun posterior lint/TS/Chromium2 con detección de console errors/hidratación y sentinel de navegación sin recarga exit0. Log .cache/verification-native.log. No aceptación integral ni Actions remoto."
+        },
+        {
+          "date": "2026-11-01",
+          "environment": "Windows; Builder único; Node 24.15.0 / PHP 8.5.10 / Composer 2.10.3",
+          "command": "node scripts/verify-harness.mjs",
+          "result": "Startup: exit 1 ENOENT documento de semillas retirado. Falta original; no reconstruido ni chequeo relajado. Bloqueo integral, no RED de aplicación. SETUP-001 permanece in-progress."
+        },
+        {
+          "date": "2026-11-01",
+          "environment": "Windows / Node 24.15.0",
+          "command": "node --test tests/runner/catalog.test.mjs",
+          "result": "RED real: Missing expected exception al no rechazar catálogo incompleto. Implementados catálogo fijo y fallos de gates/suites/entorno; contratos posteriores ejecutados. Ver progress.md para reruns finales."
+        },
+        {
+          "date": "2026-11-01",
+          "environment": "Windows / PHP 8.5.10 / PostgreSQL 18.6 test dedicado",
+          "command": "composer test:unit; $env:APP_ENV='testing'; php scripts/prepare-test.php",
+          "result": "RED subprocess detectó exit 0 incorrecto de preparación insegura (DB dev + host inválido, sin conexión/migración). Catch/exit 1 y APP_ENV explícito corregidos: Unit 3 tests / 6 assertions exit 0; preparación segura exit 0 Nothing to migrate. No hay RED previo de HTTP/SSR/DB: fallos de servicios no se cuentan como tal."
+        },
+        {
+          "date": "2026-11-01",
+          "environment": "Windows; dependencias locales; Docker Desktop",
+          "command": "composer install --no-interaction --prefer-dist; npm ci; docker compose build app quality",
+          "result": "Locks reales resueltos Laravel13.39/InertiaPHP3.6/Pest4; React19.3/InertiaJS3.10/Vite8.3.5/TS5.9.3/Tailwind4.3.3 y ESLint10 final. Install/ci ejecutados sin ignorar platform/peers. Compose primer build falló DOM/lexbor; base ya trae DOM y se corrigió compilar solo pdo_pgsql/zip/intl. Rebuild exit 0. GitHub Actions escrito, no ejecutado remoto."
+        },
+        {
+          "date": "2026-11-01",
+          "environment": "Windows Playwright 1.64.1",
+          "command": "npm exec playwright install chromium (primera instalación); node scripts/install-browser.mjs (corrección)",
+          "result": "Incidencia: primera instalación usó cache compartida del usuario y Playwright GC eliminó caches chromium/headless1243/1247 obsoletos. Orquestador informado; sin restauración ni datos de app afectados. Corrección ejecutada en .cache/ms-playwright con PLAYWRIGHT_SKIP_BROWSER_GC=1; configuración/CI e instalador usan cache privada; npm/Composer cache local. No instalaciones npm globales."
+        }
+      ]
+    },
+    {
+      "id": "F-001",
+      "name": "Registrarse y verificar identidad comercial",
+      "priority": "P0",
+      "source": "feature_list.json#/features/1",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un visitante no tiene cuenta y dispone de un email propio.",
+        "**Cuando:** Se registra con datos válidos y abre un enlace de verificación vigente.",
+        "**Entonces:** Obtiene cuenta sin permisos de publicación hasta verificar; luego puede iniciar onboarding.",
+        "**Alternativas y errores:** Datos inválidos no crean cuentas parciales; email duplicado no se replica; enlace expirado/reutilizado no habilita publicación y puede solicitarse uno nuevo con límite."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-002",
+      "name": "Entrar, recuperar acceso y actualizar credenciales",
+      "priority": "P0",
+      "source": "feature_list.json#/features/2",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un usuario tiene cuenta y credenciales válidas.",
+        "**Cuando:** Inicia o cierra sesión, cambia datos del perfil o recupera contraseña con token válido.",
+        "**Entonces:** La sesión se protege/termina según corresponda; los cambios sensibles requieren revalidación.",
+        "**Alternativas y errores:** Credenciales erróneas, exceso de intentos y tokens usados se rechazan; solicitud para email inexistente no revela su existencia."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-004",
+      "name": "Crear comercio y cambiar contexto propio",
+      "priority": "P0",
+      "source": "feature_list.json#/features/3",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un usuario autenticado y verificado administra cero o más comercios.",
+        "**Cuando:** Crea un comercio o selecciona otro del que es miembro.",
+        "**Entonces:** El nuevo comercio nace borrador con propietario; todas sus vistas y acciones corresponden al elegido.",
+        "**Alternativas y errores:** Colisión de slug no crea medio comercio; un usuario que solicita uno ajeno no entra ni ve su información; cambio de contexto no contamina pestañas."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-005",
+      "name": "Configurar identidad pública y contacto de WhatsApp",
+      "priority": "P0",
+      "source": "feature_list.json#/features/4",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-004"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** El propietario administra un comercio en borrador o publicado.",
+        "**Cuando:** Edita nombre, descripción, logo, colores acotados, contacto y teléfono de WhatsApp.",
+        "**Entonces:** Se guarda branding seguro y se puede construir un vínculo válido de contacto.",
+        "**Alternativas y errores:** Teléfono inválido impide habilitar checkout; imagen inválida o datos maliciosos se rechazan sin borrar valores sanos previos."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-006",
+      "name": "Configurar horarios, retiro y reparto",
+      "priority": "P0",
+      "source": "feature_list.json#/features/5",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-004"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** El propietario está configurando la operación de su comercio.",
+        "**Cuando:** Elige retiro y/o reparto, cargo fijo, cobertura descriptiva, horarios y política fuera de horario.",
+        "**Entonces:** La tienda muestra modalidades y acepta pedidos solo en períodos/métodos habilitados.",
+        "**Alternativas y errores:** Sin modalidad no se publica; horario inválido se rechaza; fuera de horario no acepta por defecto salvo habilitación expresa."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-007",
+      "name": "Completar onboarding, publicar y pausar tienda",
+      "priority": "P0",
+      "source": "feature_list.json#/features/6",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-005",
+        "F-006",
+        "F-013"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un comercio tiene su configuración y catálogo en preparación.",
+        "**Cuando:** El propietario completa requisitos, publica, pausa o reanuda.",
+        "**Entonces:** El checklist refleja datos reales; la tienda publicada es accesible; pausada sigue visible y no recibe pedidos nuevos.",
+        "**Alternativas y errores:** Faltantes impiden publicar; suspensión no se elude; pausar con carrito ya abierto bloquea su checkout sin borrar carrito."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-010",
+      "name": "Organizar categorías de un comercio",
+      "priority": "P0",
+      "source": "feature_list.json#/features/7",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-004"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** El propietario administra su catálogo.",
+        "**Cuando:** Crea, edita y ordena categorías planas.",
+        "**Entonces:** Los productos aparecen agrupados según su categoría en la tienda.",
+        "**Alternativas y errores:** Nombre/slug inválidos o duplicados se rechazan; no puede asociar categorías de otro comercio."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-011",
+      "name": "Crear y modificar productos simples con precio",
+      "priority": "P0",
+      "source": "feature_list.json#/features/8",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-004"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** El propietario administra su catálogo.",
+        "**Cuando:** Crea un producto borrador o modifica nombre, descripción, categoría y precio.",
+        "**Entonces:** Los cambios válidos afectan catálogo futuro sin alterar pedidos antiguos.",
+        "**Alternativas y errores:** Precio negativo, moneda ajena, categoría de otro tenant o edición concurrente obsoleta se rechazan/indican conflicto."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-012",
+      "name": "Gestionar imágenes de productos",
+      "priority": "P0",
+      "source": "feature_list.json#/features/9",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-011"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** El propietario administra un producto suyo.",
+        "**Cuando:** Sube, reordena o retira imágenes.",
+        "**Entonces:** La tienda muestra imágenes optimizadas y el catálogo conserva un orden estable.",
+        "**Alternativas y errores:** Archivo corrupto/peligroso, mayor a 5 MiB, más de 8 imágenes o referencia ajena se rechaza sin dejar asociación inválida."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-013",
+      "name": "Publicar, ocultar, marcar disponible y archivar productos",
+      "priority": "P0",
+      "source": "feature_list.json#/features/10",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-011"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un producto propio existe con datos coherentes.",
+        "**Cuando:** El propietario publica, despublica, cambia disponibilidad o archiva/restaura.",
+        "**Entonces:** Solo los publicados aparecen; solo los disponibles se pueden incluir en pedidos nuevos; históricos no cambian.",
+        "**Alternativas y errores:** Producto incompleto no se publica; carrito viejo con producto ahora no disponible exige corrección; producto archivado no se elimina del histórico."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-014",
+      "name": "Administrar catálogo mediante búsqueda y filtros",
+      "priority": "P0",
+      "source": "feature_list.json#/features/11",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-011"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un comercio tiene cero o más productos.",
+        "**Cuando:** Su propietario filtra por nombre, categoría, publicación y disponibilidad.",
+        "**Entonces:** Obtiene resultados paginados exclusivos de su comercio y estados vacíos entendibles.",
+        "**Alternativas y errores:** Filtros y paginación inválidos no exponen registros ajenos ni rompen la interfaz."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-018",
+      "name": "Abrir una tienda pública y navegar catálogo",
+      "priority": "P0",
+      "source": "feature_list.json#/features/12",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-007"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Existe una tienda publicada, pausada o en borrador.",
+        "**Cuando:** Un visitante abre su URL y recorre categorías/productos.",
+        "**Entonces:** Publicada muestra solo productos visibles; pausada informa estado; borrador no se expone.",
+        "**Alternativas y errores:** Slug ajeno/inexistente o comercio suspendido no revela datos; alternar tiendas no mezcla catálogos."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-019",
+      "name": "Buscar, filtrar y examinar productos públicos",
+      "priority": "P0",
+      "source": "feature_list.json#/features/13",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-018"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un visitante está en una tienda visible.",
+        "**Cuando:** Busca por texto/categoría y abre un producto.",
+        "**Entonces:** Ve resultados de ese comercio con detalle, precio y disponibilidad.",
+        "**Alternativas y errores:** Sin resultados se ofrece limpiar filtros; un producto borrador/ajeno no es accesible por URL directa."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-020",
+      "name": "Compartir tienda y navegar de modo accesible",
+      "priority": "P0",
+      "source": "feature_list.json#/features/14",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-018"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Una tienda está publicada.",
+        "**Cuando:** Un usuario comparte URL o navega desde móvil/teclado.",
+        "**Entonces:** El enlace resuelve al comercio correcto y páginas relevantes son comprensibles, accesibles e indexables.",
+        "**Alternativas y errores:** URL inválida no revela secretos; imágenes ausentes y navegación sin mouse conservan acceso esencial."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-021",
+      "name": "Comprender horarios y condiciones de compra",
+      "priority": "P0",
+      "source": "feature_list.json#/features/15",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-018"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un visitante examina tienda y condiciones públicas.",
+        "**Cuando:** Revisa si acepta pedidos, métodos, costos y textos legales/informativos.",
+        "**Entonces:** Se informa disponibilidad y condición de confirmación antes de comprar.",
+        "**Alternativas y errores:** Tienda cerrada/pausada muestra aviso y no permite avanzar a compra nueva; no se oculta información requerida."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-022",
+      "name": "Agregar, ajustar y quitar productos del carrito",
+      "priority": "P0",
+      "source": "feature_list.json#/features/16",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-018"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un comprador explora productos publicados y disponibles.",
+        "**Cuando:** Agrega cantidades, modifica líneas o las retira.",
+        "**Entonces:** El carrito del comercio refleja selección válida y subtotal visual estimado.",
+        "**Alternativas y errores:** Cantidad negativa, decimal, mayor a 20 o más de 50 líneas se rechaza; producto de otra tienda no entra."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-023",
+      "name": "Conservar carrito por comercio sin exigir cuenta",
+      "priority": "P0",
+      "source": "feature_list.json#/features/17",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-022"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un comprador usa un navegador compatible o restringido.",
+        "**Cuando:** Navega, cierra y vuelve a abrir una tienda.",
+        "**Entonces:** Recupera selección de esa tienda si hay almacenamiento; en modo restringido conserva selección durante la visita.",
+        "**Alternativas y errores:** Datos locales corruptos no se ejecutan ni cobran como precios; carritos de comercios distintos no se mezclan."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-024",
+      "name": "Revisar carrito con información actualizada",
+      "priority": "P0",
+      "source": "feature_list.json#/features/18",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-022"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un carrito contiene selecciones antiguas.",
+        "**Cuando:** El comprador vuelve a visualizarlo o intenta pasar a checkout.",
+        "**Entonces:** Se muestran cambios de precio, nombre y disponibilidad y se puede corregir antes de continuar.",
+        "**Alternativas y errores:** Productos archivados, moneda inválida o líneas no disponibles impiden continuar hasta corrección."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-025",
+      "name": "Elegir modalidad de entrega válida",
+      "priority": "P0",
+      "source": "feature_list.json#/features/19",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-006",
+        "F-022"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** La tienda tiene retiro y/o reparto configurado.",
+        "**Cuando:** El comprador elige modalidad e ingresa dirección si corresponde.",
+        "**Entonces:** Se muestra retiro o costo fijo de entrega y condiciones de cobertura.",
+        "**Alternativas y errores:** Dirección faltante, modalidad desactivada o tarifa modificada exigen corregir/reconfirmar."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-026",
+      "name": "Comunicar instrucciones del pedido",
+      "priority": "P0",
+      "source": "feature_list.json#/features/20",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-022"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un comprador tiene productos en carrito.",
+        "**Cuando:** Agrega notas generales o por línea.",
+        "**Entonces:** Las observaciones válidas acompañan el pedido y son visibles al comerciante.",
+        "**Alternativas y errores:** Texto demasiado largo/malicioso se rechaza o se presenta escapado; no cambia precios ni crea extras facturables."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-027",
+      "name": "Identificar al comprador invitado para el pedido",
+      "priority": "P0",
+      "source": "feature_list.json#/features/21",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-022"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un carrito válido está listo para cotizar.",
+        "**Cuando:** El comprador ingresa nombre, teléfono, dirección si aplica y acepta aviso de privacidad.",
+        "**Entonces:** Los datos mínimos quedan asociados a la solicitud sin crear cuenta.",
+        "**Alternativas y errores:** Datos insuficientes o inválidos impiden generar pedido; no se filtra información personal en URL."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-028",
+      "name": "Cotizar y exigir aceptación del precio vigente",
+      "priority": "P0",
+      "source": "feature_list.json#/features/22",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-024",
+        "F-025",
+        "F-027"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Comprador tiene carrito, modalidad y comercio elegidos.",
+        "**Cuando:** Solicita cotización y la confirma tras ver el desglose.",
+        "**Entonces:** El servidor presenta subtotal, tarifa y total vigentes en moneda del comercio.",
+        "**Alternativas y errores:** Precio, producto, horario o modalidad cambiados devuelven explicación y nueva revisión; no se crea pedido sin aceptación."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-029",
+      "name": "Registrar pedido exactamente una vez",
+      "priority": "P0",
+      "source": "feature_list.json#/features/23",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-028"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** El comprador aceptó una cotización vigente y envía una intención identificable.",
+        "**Cuando:** Confirma compra y repite por doble clic o timeout.",
+        "**Entonces:** Existe una sola orden pendiente, con líneas/precios históricos y número; el reintento recupera el mismo resultado.",
+        "**Alternativas y errores:** Payload distinto con misma clave genera conflicto; fallo antes de persistir no deja orden parcial; recuperación garantizada 72 h."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-030",
+      "name": "Recibir confirmación web del pedido",
+      "priority": "P0",
+      "source": "feature_list.json#/features/24",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-029"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un pedido fue guardado con éxito.",
+        "**Cuando:** El comprador llega o recarga la confirmación.",
+        "**Entonces:** Ve número, resumen, estado pendiente, enlace de seguimiento y acción manual de WhatsApp sin crear otro pedido.",
+        "**Alternativas y errores:** Token inválido no revela la orden; la pantalla nunca afirma pago, aceptación o mensaje enviado."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-031",
+      "name": "Pasar de pedido registrado a contacto manual por WhatsApp",
+      "priority": "P0",
+      "source": "feature_list.json#/features/25",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-030"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** El comprador tiene confirmación de un pedido existente.",
+        "**Cuando:** Elige abrir WhatsApp, reintentar o copiar el mensaje.",
+        "**Entonces:** Se utiliza el mismo pedido y un texto precargado sin tokens secretos; el estado sigue pendiente.",
+        "**Alternativas y errores:** WhatsApp ausente/bloqueado o cierre sin envío conserva la orden y permite alternativa de contacto."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-032",
+      "name": "Consultar seguimiento con enlace seguro",
+      "priority": "P0",
+      "source": "feature_list.json#/features/26",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-029"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un comprador conserva el token de seguimiento de su pedido.",
+        "**Cuando:** Abre el enlace durante la vigencia.",
+        "**Entonces:** Ve número, estado, comercio y resumen minimizado sin iniciar sesión.",
+        "**Alternativas y errores:** Token falso, revocado o vencido no revela información; número de orden solo no permite consultar datos."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-034",
+      "name": "Resistir intentos abusivos de checkout",
+      "priority": "P0",
+      "source": "feature_list.json#/features/27",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-029"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Existen endpoints públicos para crear pedidos.",
+        "**Cuando:** Un cliente normal o un origen abusivo envía solicitudes.",
+        "**Entonces:** Pedidos legítimos pueden completarse con límites razonables; abuso recibe limitación y feedback.",
+        "**Alternativas y errores:** Excesos de frecuencia, cantidades o payload se rechazan; reintento legítimo con la misma clave no genera compra duplicada."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-035",
+      "name": "Ver y consultar bandeja de pedidos del comercio",
+      "priority": "P0",
+      "source": "feature_list.json#/features/28",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-029"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un propietario inicia sesión en uno de sus comercios.",
+        "**Cuando:** Abre lista y detalle de pedidos.",
+        "**Entonces:** Ve pedidos propios, estado, fecha, modalidad, total y contacto necesario; pendientes destacados.",
+        "**Alternativas y errores:** Lista vacía informa; pedido de otro comercio no es accesible; errores de consulta no mutan órdenes."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-036",
+      "name": "Aceptar o rechazar un pedido pendiente",
+      "priority": "P0",
+      "source": "feature_list.json#/features/29",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-035"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Una orden del comercio está pendiente.",
+        "**Cuando:** El propietario confirma tras revisar disponibilidad o la rechaza.",
+        "**Entonces:** Pasa a confirmado o rechazado y se registra una única transición con actor/fecha.",
+        "**Alternativas y errores:** Estado ya cambiado, acceso ajeno o acción concurrente generan respuesta coherente sin transición doble."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-037",
+      "name": "Acompañar preparación y entrega declarada",
+      "priority": "P0",
+      "source": "feature_list.json#/features/30",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-036"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Una orden está confirmada.",
+        "**Cuando:** El propietario avanza en preparación, lista y completada en secuencia.",
+        "**Entonces:** Se refleja el estado actualizado y el comprador lo puede consultar.",
+        "**Alternativas y errores:** No se permiten saltos, reversiones ni completar estados terminales; completado no significa pago acreditado."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-038",
+      "name": "Cancelar y auditar el ciclo de vida de pedidos",
+      "priority": "P0",
+      "source": "feature_list.json#/features/31",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-036"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Una orden está en estado cancelable o tiene historial.",
+        "**Cuando:** El propietario cancela con motivo o consulta su línea de tiempo.",
+        "**Entonces:** La cancelación válida es terminal y los eventos muestran actor y cronología.",
+        "**Alternativas y errores:** No se cancela completado/rechazado; una transición fallida no registra un evento falso."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-044",
+      "name": "Conocer nuevos pedidos aunque falle el correo",
+      "priority": "P0",
+      "source": "feature_list.json#/features/32",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-035"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Se registró un pedido nuevo.",
+        "**Cuando:** El comerciante accede al panel y, si configurado, recibe aviso adicional.",
+        "**Entonces:** La orden está en bandeja y el correo se intenta sin bloquear el flujo.",
+        "**Alternativas y errores:** Proveedor de correo caído o aviso repetido no borra ni duplica órdenes."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-045",
+      "name": "Consultar actualizaciones del pedido sin mensajes automáticos",
+      "priority": "P0",
+      "source": "feature_list.json#/features/33",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-032",
+        "F-036"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** El comerciante cambió válidamente el estado.",
+        "**Cuando:** El comprador actualiza su enlace de seguimiento.",
+        "**Entonces:** Ve el estado autoritativo actual.",
+        "**Alternativas y errores:** Token inválido o indisponibilidad temporal no exponen datos personales ni inventan una notificación entregada."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-047",
+      "name": "Contactar manualmente al comprador desde un pedido",
+      "priority": "P0",
+      "source": "feature_list.json#/features/34",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001",
+        "F-035"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** El propietario accede legítimamente al pedido y su contacto.",
+        "**Cuando:** Elige iniciar conversación telefónica/WhatsApp.",
+        "**Entonces:** Puede contactar al comprador usando solo información del pedido propio.",
+        "**Alternativas y errores:** Teléfono inválido o falta de permisos impiden acción; abrir vínculo no se registra como entrega de mensaje."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-061",
+      "name": "Mantener aislamiento y permisos en todas las operaciones",
+      "priority": "P0",
+      "source": "feature_list.json#/features/35",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Existen al menos dos comercios con recursos separados.",
+        "**Cuando:** Usuarios, visitantes o procesos intentan leer o cambiar recursos propios y ajenos.",
+        "**Entonces:** Solo se autorizan operaciones propias y las relaciones mantienen integridad.",
+        "**Alternativas y errores:** ID ajeno, permiso alterado en request, referencia cruzada, recurso de storage ajeno o consulta mal acotada no filtran ni mutan datos."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-062",
+      "name": "Conservar consistencia ante concurrencia y reintentos",
+      "priority": "P0",
+      "source": "feature_list.json#/features/36",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Varias solicitudes o procesos intentan operar la misma intención/orden.",
+        "**Cuando:** Se ejecuta creación o cambio de estado mientras llegan duplicados/fallos.",
+        "**Entonces:** Un único resultado válido y auditoría coherente sobreviven a la simultaneidad.",
+        "**Alternativas y errores:** Rollback no deja pedidos parciales; job repetido no duplica efecto; acción fallida no genera auditoría falsa."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-063",
+      "name": "Proteger información personal, archivos y secretos",
+      "priority": "P0",
+      "source": "feature_list.json#/features/37",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** La plataforma maneja contactos, sesiones y recursos de tienda.",
+        "**Cuando:** Actores autorizados navegan y operan datos.",
+        "**Entonces:** Datos mínimos se presentan y almacenan según privilegios; los secretos quedan fuera de la experiencia pública.",
+        "**Alternativas y errores:** Ataques de archivo, URLs adivinadas, entrada maliciosa o mensajes de error no revelan contactos/tokens/credenciales."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-064",
+      "name": "Recuperar operación y degradar sin engaños ante fallos",
+      "priority": "P0",
+      "source": "feature_list.json#/features/38",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un tercero falla, el servicio cae o se debe restaurar información.",
+        "**Cuando:** Se reintenta, consulta o restaura el servicio.",
+        "**Entonces:** Órdenes persistidas siguen recuperables; se diferencia éxito de error; restauración se comprueba.",
+        "**Alternativas y errores:** Caída de WhatsApp/correo/IA no inventa confirmaciones; backup fallido genera alerta y no se declara recuperación sin prueba."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-065",
+      "name": "Ejecutar y verificar el sistema con o sin Docker",
+      "priority": "P0",
+      "source": "feature_list.json#/features/39",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un desarrollador cuenta con requisitos de software compatibles, con o sin Docker.",
+        "**Cuando:** Inicia el sistema, usa PostgreSQL y ejecuta los flujos y pruebas comunes.",
+        "**Entonces:** Obtiene comportamiento equivalente en ambos modos, sin alterar código de negocio.",
+        "**Alternativas y errores:** Falta de dependencias, puerto ocupado o base inaccesible muestran diagnóstico claro y no fuerzan usar Docker."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-003",
+      "name": "Proteger acceso con segundo factor",
+      "priority": "P1",
+      "source": "feature_list.json#/features/40",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un usuario elegible controla su sesión y medio de recuperación.",
+        "**Cuando:** Habilita segundo factor y vuelve a acceder.",
+        "**Entonces:** El siguiente login exige el factor y los códigos de recuperación son de un uso.",
+        "**Alternativas y errores:** Código inválido o repetido bloquea acceso; soporte no elude el factor sin procedimiento seguro."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-008",
+      "name": "Cambiar dirección pública de tienda sin perder enlaces",
+      "priority": "P1",
+      "source": "feature_list.json#/features/41",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Una tienda dispone de slug público.",
+        "**Cuando:** El propietario elige uno nuevo disponible.",
+        "**Entonces:** La URL nueva funciona y la anterior redirige según política.",
+        "**Alternativas y errores:** Slugs ocupados/reservados se rechazan sin redirigir a comercios ajenos."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-009",
+      "name": "Delegar operación y preservar propiedad",
+      "priority": "P1",
+      "source": "feature_list.json#/features/42",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un propietario tiene un comercio y desea delegar o transferir.",
+        "**Cuando:** Invita operador, modifica/revoca acceso, transfiere propiedad o archiva.",
+        "**Entonces:** Los nuevos permisos surten efecto tras aceptación válida; historial permanece y nunca queda un comercio sin owner.",
+        "**Alternativas y errores:** Invitación vencida o ajena falla; un operador no administra cobros/roles; último propietario no puede abandonar sin transferencia."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-015",
+      "name": "Importar y exportar catálogo mediante CSV",
+      "priority": "P1",
+      "source": "feature_list.json#/features/43",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un usuario autorizado tiene un archivo compatible o necesita exportación.",
+        "**Cuando:** Previsualiza columnas/errores, confirma importación o pide exportación.",
+        "**Entonces:** Los registros aprobados se crean/actualizan sin duplicados y la exportación contiene solo catálogo propio.",
+        "**Alternativas y errores:** Filas inválidas se reportan; reintentos no duplican; CSV potencialmente ejecutable se neutraliza."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-016",
+      "name": "Vender productos con variantes y extras",
+      "priority": "P1",
+      "source": "feature_list.json#/features/44",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un producto tiene opciones configuradas.",
+        "**Cuando:** El comprador selecciona variantes y extras válidos.",
+        "**Entonces:** Se calcula el precio autoritativamente y el pedido guarda opciones/precios históricos.",
+        "**Alternativas y errores:** Combinación inválida, opción obligatoria faltante o precio manipulado bloquean confirmación y permiten corregir."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-033",
+      "name": "Pedir cancelación desde seguimiento",
+      "priority": "P1",
+      "source": "feature_list.json#/features/45",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** El comprador tiene un pedido no terminal y su token válido.",
+        "**Cuando:** Solicita cancelación indicando motivo.",
+        "**Entonces:** La solicitud queda marcada para decisión del comerciante, sin cambiar falsamente el estado a cancelado.",
+        "**Alternativas y errores:** Pedido terminal o repetición no crea transición indebida; durante preparación requiere negociación."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-039",
+      "name": "Buscar y exportar pedidos propios",
+      "priority": "P1",
+      "source": "feature_list.json#/features/46",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un propietario tiene pedidos históricos.",
+        "**Cuando:** Filtra por estado, fecha o número y solicita exportación.",
+        "**Entonces:** Recibe únicamente registros autorizados y exportación accesible temporalmente.",
+        "**Alternativas y errores:** Archivos muy grandes, referencias ajenas o CSV peligroso se manejan sin fuga."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-040",
+      "name": "Registrar notas operativas privadas",
+      "priority": "P1",
+      "source": "feature_list.json#/features/47",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un miembro autorizado abre un pedido.",
+        "**Cuando:** Agrega observaciones internas.",
+        "**Entonces:** La nota queda auditada y solo visible al equipo del comercio.",
+        "**Alternativas y errores:** Seguimiento público no revela notas; contenido malicioso se presenta de forma segura."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-041",
+      "name": "Gestionar desacuerdos sin reescribir pedidos",
+      "priority": "P1",
+      "source": "feature_list.json#/features/48",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un pedido confirmado requiere una modificación comercial.",
+        "**Cuando:** El comerciante documenta acuerdo o genera nueva intención tras anular la anterior.",
+        "**Entonces:** Se preserva precio/cantidad originales y queda trazabilidad del nuevo acuerdo.",
+        "**Alternativas y errores:** Intento de editar directamente un snapshot histórico se rechaza."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-042",
+      "name": "Detectar pendientes antiguos sin expirarlos por defecto",
+      "priority": "P1",
+      "source": "feature_list.json#/features/49",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Existen pedidos pendientes y reglas de alerta configuradas.",
+        "**Cuando:** Transcurre el umbral definido.",
+        "**Entonces:** El comercio recibe aviso sin pérdida de pedido; la expiración solo ocurre si habilitó política explícita.",
+        "**Alternativas y errores:** Un aviso repetido no duplica efectos; confirmación concurrente impide expiración incorrecta."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-043",
+      "name": "Entender volumen de pedidos sin confundirlo con cobros",
+      "priority": "P1",
+      "source": "feature_list.json#/features/50",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** El propietario selecciona un período.",
+        "**Cuando:** Consulta resumen de pendientes, confirmados, rechazados y completados.",
+        "**Entonces:** Se muestran conteos y valores nominales diferenciados de ingresos cobrados.",
+        "**Alternativas y errores:** Pedidos rechazados no computan completados; filtros no agregan otros comercios."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-046",
+      "name": "Avisar automáticamente cambios de estado con consentimiento",
+      "priority": "P1",
+      "source": "feature_list.json#/features/51",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Hay canal permitido y destinatario elegible.",
+        "**Cuando:** Una orden cambia de estado.",
+        "**Entonces:** Se envía un aviso coherente con el estado sin duplicaciones abusivas.",
+        "**Alternativas y errores:** Error del proveedor, exclusión o falta de consentimiento no revierte transición ni produce spam."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-048",
+      "name": "Obtener una propuesta de tienda con IA",
+      "priority": "P1",
+      "source": "feature_list.json#/features/52",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** El propietario describe su negocio.",
+        "**Cuando:** Solicita ayuda para organizar categorías y textos iniciales.",
+        "**Entonces:** Recibe una propuesta editable pendiente de aprobación, no una tienda ya publicada.",
+        "**Alternativas y errores:** Fallo del proveedor o datos insuficientes permiten continuar manualmente y no inventan productos reales."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-049",
+      "name": "Extraer y proponer catálogo asistido por IA",
+      "priority": "P1",
+      "source": "feature_list.json#/features/53",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un comerciante aporta texto, foto o planilla.",
+        "**Cuando:** Pide identificar productos/categorías/descripciones.",
+        "**Entonces:** Ve borradores estructurados y advertencias sobre campos inciertos.",
+        "**Alternativas y errores:** Precios o disponibilidad no inferibles quedan pendientes; archivo inválido/IA caída no altera catálogo publicado."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-050",
+      "name": "Revisar y aplicar propuestas de IA",
+      "priority": "P1",
+      "source": "feature_list.json#/features/54",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Existen propuestas propias no publicadas.",
+        "**Cuando:** Un comerciante autorizado corrige, descarta o aprueba.",
+        "**Entonces:** Solo las entradas aprobadas se incorporan a su catálogo mediante reglas normales.",
+        "**Alternativas y errores:** Tenant ajeno o propuesta con errores no se aplica; un resultado tardío no sobrescribe cambios humanos."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-051",
+      "name": "Controlar consumo y recuperación de solicitudes de IA",
+      "priority": "P1",
+      "source": "feature_list.json#/features/55",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Hay cuota por comercio y una solicitud de IA.",
+        "**Cuando:** Se inicia, falla, se reintenta o cancela una generación.",
+        "**Entonces:** Se observa su estado, consumo/costo y resultado único.",
+        "**Alternativas y errores:** Cuota excedida, timeout, duplicado o resultado tardío tras cancelar no publica dos veces ni cobra como éxito."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-052",
+      "name": "Conocer planes y activar una prueba o beneficio",
+      "priority": "P1",
+      "source": "feature_list.json#/features/56",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un propietario consulta la oferta de la plataforma.",
+        "**Cuando:** Revisa precio/límites y activa prueba elegible o un beneficio autorizado.",
+        "**Entonces:** Las condiciones y fechas son visibles, se asignan derechos de uso correctos.",
+        "**Alternativas y errores:** Pruebas duplicadas no se conceden indebidamente; valores manipulados no modifican precios reales."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-053",
+      "name": "Contratar suscripción y verificar su vigencia",
+      "priority": "P1",
+      "source": "feature_list.json#/features/57",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un propietario inicia contratación o cambio de plan.",
+        "**Cuando:** Completa flujo externo y el sistema recibe eventos verificables.",
+        "**Entonces:** Plan y derechos de uso reflejan estado confirmado del proveedor.",
+        "**Alternativas y errores:** Redirect exitoso sin verificación no activa plan; webhooks duplicados/desordenados/falsos no conceden acceso."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-054",
+      "name": "Aplicar límites, mora y reactivación conservando datos",
+      "priority": "P1",
+      "source": "feature_list.json#/features/58",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un comercio tiene plan activo, en gracia o vencido.",
+        "**Cuando:** Usa capacidades sujetas a plan o regulariza pago.",
+        "**Entonces:** Derechos de uso y límites se aplican consistentemente; recuperar pago rehabilita lo permitido.",
+        "**Alternativas y errores:** Al superar cuota/mora se bloquean nuevas acciones correspondientes sin borrar pedidos ni impedir recuperar información."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-055",
+      "name": "Consultar cargos y comprobantes del SaaS",
+      "priority": "P1",
+      "source": "feature_list.json#/features/59",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un propietario tiene movimientos de su suscripción.",
+        "**Cuando:** Abre historial o comprobante.",
+        "**Entonces:** Ve estados y documentos propios con sincronización declarada.",
+        "**Alternativas y errores:** Documento de otro tenant o enlace vencido se rechaza; pendiente no se muestra como factura emitida."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-057",
+      "name": "Acceder a administración global y consultar estado de la plataforma",
+      "priority": "P1",
+      "source": "feature_list.json#/features/60",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un administrador global tiene privilegios específicos.",
+        "**Cuando:** Entra a consola y busca comercios/suscripciones/estado operativo.",
+        "**Entonces:** Ve información mínima necesaria sin asumir rol de propietario.",
+        "**Alternativas y errores:** Un owner común no entra; acceso a datos personales excepcionales exige permiso y auditoría."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-058",
+      "name": "Suspender, reactivar y asistir comercios de forma auditable",
+      "priority": "P1",
+      "source": "feature_list.json#/features/61",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Existe una incidencia o restricción legítima.",
+        "**Cuando:** Administrador global suspende, reabre o ejecuta soporte autorizado.",
+        "**Entonces:** Se bloquean pedidos nuevos durante suspensión y queda evidencia del actor/motivo.",
+        "**Alternativas y errores:** No se suplanta silenciosamente al propietario; reactivación sin requisitos no se permite."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-059",
+      "name": "Administrar planes y revisar métricas operativas",
+      "priority": "P1",
+      "source": "feature_list.json#/features/62",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** El administrador global opera la oferta comercial.",
+        "**Cuando:** Modifica condiciones para nuevos acuerdos o consulta métricas.",
+        "**Entonces:** Ve altas, pedidos declarados, errores y uso de IA sin distorsionar datos históricos.",
+        "**Alternativas y errores:** Cambiar plan no reescribe contratos previos; no se rotulan pedidos completados como ingresos cobrados."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-060",
+      "name": "Exportar, conservar y suprimir datos con autoridad",
+      "priority": "P1",
+      "source": "feature_list.json#/features/63",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Un propietario o responsable autorizado formula solicitud legítima.",
+        "**Cuando:** Solicita copia, supresión o anonimización de datos.",
+        "**Entonces:** Se verifica autoridad, se registra resultado y se conservan excepciones obligatorias.",
+        "**Alternativas y errores:** Solicitudes ajenas, preservación legal o error de proceso no causan borrado irreparable."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-017",
+      "name": "Aplicar promociones y cupones verificables",
+      "priority": "P2",
+      "source": "feature_list.json#/features/64",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** Existen reglas de promociones habilitadas.",
+        "**Cuando:** Un comprador usa una promoción válida.",
+        "**Entonces:** El descuento y sus condiciones se reflejan en la cotización histórica.",
+        "**Alternativas y errores:** Cupón vencido, abuso, incompatibilidad o concurrencia no generan descuento indebido."
+      ],
+      "evidence": []
+    },
+    {
+      "id": "F-056",
+      "name": "Pagar pedidos dentro de la tienda",
+      "priority": "P2",
+      "source": "feature_list.json#/features/65",
+      "description": "Contrato de aceptación canónico en esta entrada del tracker.",
+      "dependencies": [
+        "SETUP-001"
+      ],
+      "status": "not-started",
+      "acceptance": [
+        "**Dado:** El comercio vinculó una cuenta de cobro autorizada.",
+        "**Cuando:** El comprador inicia y completa o no un pago de su pedido.",
+        "**Entonces:** El sistema separa estado de pago verificado del estado operativo de pedido.",
+        "**Alternativas y errores:** Webhook falso, pago duplicado, pendiente o reembolso no generan acreditación ficticia."
+      ],
+      "evidence": []
+    }
+  ]
+}

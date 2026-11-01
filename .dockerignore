@@ -1,0 +1,11 @@
+.git
+.env
+.env.testing
+.bootstrap
+.cache
+node_modules
+vendor
+storage/logs
+storage/framework/views
+test-results
+playwright-report
