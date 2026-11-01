@@ -88,7 +88,7 @@ Detener Vite y su hot file antes del entrypoint obligatorio; nunca usar ese smok
 
 ### Gates dentro de Compose
 
-Servicio `quality` incluye PHP/Composer/Node y Chromium fijado al lock, con dependencias de SO y cache privada en la imagen. Los volúmenes de dependencias son exclusivos Linux y separados de los del host/Node dev.
+Servicio `quality` incluye PHP/Composer/Node y Chromium fijado al lock, con dependencias de SO y cache privada en la imagen. Los volúmenes de dependencias son exclusivos Linux y separados de los del host/Node dev. `quality-browser` monta `/app/.cache/ms-playwright` y se inicializa desde la imagen: Chromium Linux no usa ni modifica la caché Windows del bind mount. La configuración fuerza esa ruta privada, sin aceptar overrides externos; GC deshabilitado.
 
 ```powershell
 # .env.testing debe existir antes de verificar

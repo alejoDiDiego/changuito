@@ -5,7 +5,8 @@ COPY --from=node:24.15.0-bookworm /usr/local/ /usr/local/
 # Local npm tool prefix, not a global installation; match native and CI before npm ci.
 RUN npm install --prefix /opt/npm --save-exact --ignore-scripts --no-fund --no-audit npm@12.0.2
 ENV PATH="/opt/npm/node_modules/.bin:${PATH}"
-ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright PLAYWRIGHT_SKIP_BROWSER_GC=1
+# Private Linux browser cache, seeded into the dedicated Compose volume.
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/.cache/ms-playwright PLAYWRIGHT_SKIP_BROWSER_GC=1
 COPY package.json package-lock.json .npmrc /opt/browser/
 RUN cd /opt/browser && npm ci --no-fund --no-audit && npx --no-install playwright install --with-deps chromium
 WORKDIR /app
