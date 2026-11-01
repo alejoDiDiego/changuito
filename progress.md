@@ -3,8 +3,8 @@
 ## Current State
 
 **Last Updated:** 2026-11-01 (America/Buenos_Aires)
-**Current Objective:** Implementar únicamente SETUP-001; aceptación reservada al Checker independiente.
-**Active Feature:** SETUP-001 `in-progress`; otras 65 entradas `not-started`.
+**Current Objective:** Cerrar SETUP-001; no iniciar otra feature sin solicitud.
+**Active Feature:** SETUP-001 `in-progress` (aceptación técnica 1-4 PASS; bloqueo real de transición `done` en el gate runner); otras 65 entradas `not-started`.
 
 ## What's Done
 
@@ -109,3 +109,53 @@ Esta sección reemplaza las instrucciones históricas de restituir el documento 
 - Playwright fuerza cache privada incluso si existe override externo; GC deshabilitado, no tocar cache compartida.
 - Remoto inspeccionado dos veces sin refs; Git inicializado main y origin autorizado. GCM no interactivo y API confirmaron push_permission=true sin imprimir credenciales. No inferir falta de auth por ausencia de gh/tokens ambientales.
 - Próximo único escritor de aceptación: Checker independiente; no iniciar otra feature. Resultados completos y SHA/CI se registran debajo.
+
+
+### Publicación y Actions reales — resultado vigente
+
+- Implementación publicada: origin/main ccb69dd24a06c5016dedc490c4207d0dcc1ea455 (bootstrap b797830 + fix cache Linux ccb69dd), sin force ni integración destructiva. Lista explícita115 archivos revisada; env locales/deps/cache/logs/build/reportes ignorados; scan secretos sin hits. git diff --cached --check del commit inicial detectó únicamente whitespace preexistente en skill/docs Markdown (incluye hard breaks); no se alteró skill ajena por estilo.
+- Nativo: preparación explícita Nothing to migrate, entrypoint14/14 exit0, runner9/9, Chromium2/2. Logs privados .cache/builder2-native.log.
+- Primera corrida https://github.com/alejoDiDiego/changuito/actions/runs/41279566827 SHA b7978305c210b6af10cff4fba8a56073c56cb691: native success, compose failure (browser ausente al forzar ruta privada). Fallo local Compose equivalente preservado en .cache/builder2-compose.log. Fix no relaja gate: image/cache privada Linux sembrada en quality-browser; no toca cache usuario ni cache Windows.
+- Corrida corregida https://github.com/alejoDiDiego/changuito/actions/runs/41279886731 SHA ccb69dd24a06c5016dedc490c4207d0dcc1ea455: COMPLETED/SUCCESS, native124769461702 SUCCESS y compose124769461518 SUCCESS. API + logs de AMBOS jobs verifican14 gates y Chromium2 passed; prep/cleanup success. Logs privados .cache/ci-124769461518.log y .cache/ci-124769461702.log, resumen .cache/actions-result.json. No logs privados publicados.
+
+### Siguiente único escritor: Checker, sin implementación
+
+Revisar aceptación independiente y mantener una sola feature. Builder NO marca done. El árbol entregado deja únicamente feature_list.json/progress.md/session-handoff.md de evidencia sin commit; implementación ya publicada en SHA anterior. Tras su revisión, Checker puede publicar SOLO esos3 artefactos: inspeccionar git status --short y git diff -- esos archivos, ejecutar harness y tests pertinentes, git fetch origin, comprobar git merge-base --is-ancestor origin/main HEAD (si falla, preservar historia y resolver sin force), git add -- feature_list.json progress.md session-handoff.md, revisar git diff --cached, git commit de evidencia y git push origin main. No git add ciego ni publicar cache/env/logs. Registrar nuevo SHA y observar Actions native+compose para ESE SHA, no atribuirle automáticamente el resultado del SHA anterior. No empezar otra feature.
+
+
+### Cierre local comprobado del Builder
+
+- Compose corregido: build quality exit0; preparación explícita Nothing to migrate exit0;14/14 gates exit0, runner9/9, Chromium2/2. Log privado .cache/builder2-compose-fixed.log. Gates nativos/Compose se ejecutaron EN SERIE.
+- docker compose down --remove-orphans exit0, SIN -v/prune. Sin contenedores/red propios;7 volúmenes conservados (incluye nuevo quality-browser). Puertos8000/18080/8011/13714/5173/55432/55433/8025/1025 sin listeners; public/hot y config cache ausentes. No restaurar/tocar cache compartida.
+- Git status final esperado: M feature_list.json, M progress.md, M session-handoff.md, únicamente evidencia sin commit para Checker. Implementación publicada origin/main ccb69dd24a06c5016dedc490c4207d0dcc1ea455. Jobs propios recogidos. SETUP sigue in-progress;65 not-started; ninguna done.
+- Limitaciones históricas irreversibles preservadas: no hubo RED previo de capacidad inicial HTTP/SSR/DB; incidente de browserGC de ronda anterior no se reescribe ni se restaura. Auditoría100 es estructural, no medición de eficacia.
+
+
+## Checker independiente final — 2026-11-01 (America/Buenos_Aires)
+
+**Alcance:** revisión fresca, sin delegar ni editar implementación. Único escritor de estado/evidencia en esta ronda. Solo PostgreSQL test aislado (127.0.0.1:55433/volumen `test-db`) y cache privada `.cache/ms-playwright`; sin instalar dependencias (solo preparación test explícita). No se creó backlog alternativo ni se inició otra feature.
+
+### Resultado por aceptación
+
+| Criterio | Resultado | Evidencia real |
+|---|---|---|
+| 1. Compatibilidad y lockfiles | **PASS** | `composer validate --strict`, `composer check-platform-reqs`, `composer install --dry-run --no-scripts` y `npm ci --dry-run` exit0; `npm ls` sin peers inválidos. Laravel13.39.0/PHP8.5.10, Inertia PHP3.6.0, React19.3.1/InertiaJS3.10.0, Vite8.3.5, TS5.9.3, Tailwind4.3.3. |
+| 2. Inicio nativo/Compose + PostgreSQL test aislado | **PASS** | Nativo: preparación `Nothing to migrate` exit0 y entrypoint14/14 exit0; Playwright inicia PHP/SSR reales y consulta PostgreSQL. Compose quality: preparación exit0, 14/14 exit0, DB `changuito_test/changuito_test` aislada (4 tablas), npm12.0.2/Playwright1.64.1 dentro de quality. [verification.md](docs/verification.md) conserva la preparación nativa/Compose. |
+| 3. Gates reales y GitHub Actions | **PASS** | Los14 gates se ejecutaron nativo y Compose. CI de implementación ccb69dd24a06c5016dedc490c4207d0dcc1ea455: run41279886731 COMPLETED/SUCCESS; native124769461702 SUCCESS y compose124769461518 SUCCESS (API de jobs). |
+| 4. Entrypoint fail-closed sin instalar/migrar | **PASS** | Entrypoint14/14; runner9/9 prueba catálogo faltante/duplicado, suite vacía y fallos reales; `DB_DATABASE=changuito_dev` exit1 antes de gates (`Unsafe test environment`); no hay install/migrate en el entrypoint. |
+
+### Rerun real
+
+- Nativo: `APP_ENV=testing php scripts/prepare-test.php` exit0 `Nothing to migrate`; `node scripts/verify-harness.mjs --application` exit0, 14/14 gates, runner9/9, Pest Unit3/6, Feature2/16, Architecture2/13, Pint28, Larastan8, ESLint/TS, builds cliente/SSR, Chromium2/2. Log privado `.cache/checker2-native.log`.
+- Compose: `docker compose run --rm quality php scripts/prepare-test.php` exit0; `docker compose run --rm quality node scripts/verify-harness.mjs --application` exit0, mismos14 gates y Chromium2/2. Log privado `.cache/checker2-compose.log`.
+- Negativo: `DB_DATABASE=changuito_dev node scripts/verify-harness.mjs --application` exit1 antes de ejecutar gates; log `.cache/checker2-unsafe.log`.
+- Contratos: harness exit0; `node --test tests/runner/*.test.mjs` 9/9; 66 entradas exactas; solo SETUP in-progress y65 not-started; otras65 con acceptance/priority/dependencies/status sin cambios vs HEAD; documento de semillas retirado `git grep0`; source pointers resuelven identidad (tests del tracker).
+- Limpieza: `docker compose down --remove-orphans` exit0, sin `-v`/prune; 7 volúmenes conservados, sin contenedores/red propios; puertos8000/18080/8011/13714/5173/55432/55433/8025/1025 libres; `public/hot` y `bootstrap/cache/config.php` ausentes. Jobs propios recogidos.
+
+### Bloqueo real: no se puede marcar `done` todavía
+
+Al cambiar SETUP-001 a `done`, el caso negativo `t.features[1].status='in-progress'` de `tests/runner/tracker.test.mjs` deja de violar dependencias porque F-001 depende de SETUP ya `done`; `validateTracker` acepta la mutación y `assert.throws` falla con `Missing expected exception`. Reproducido con una fixture aislada (copia de scripts/test, sin tocar implementación): 3/4 tests, exit1, log `.cache/checker2-done-runner.log`. Por tanto `done` rompería el gate runner obligatorio, el entrypoint y CI. No se editó implementación ni se marcó done; SETUP permanece `in-progress`. La corrección (caso negativo con dependencia insatisfecha o SETUP `not-started`) queda para una ronda de implementación autorizada; este Checker no la ejecuta ni solicita un segundo Builder en esta ronda.
+
+### Estado final y publicación
+
+SETUP-001 **`in-progress`**; otras65 **`not-started`**; ninguna otra activa ni `done`. Aceptación técnica 1-4 PASS, pero la transición de estado no es válida con los gates actuales. No iniciar otra feature ni crear backlog alternativo. Tras corregir el caso negativo y repetir entrypoint/CI, la aceptación podrá registrarse. Esta ronda publica SOLO `feature_list.json`, `progress.md` y `session-handoff.md`; el CI del nuevo SHA de estado se consulta por API y se registra como evidencia local (`.cache/checker2-state-actions.json`) sin re-publicar, para evitar un bucle de commits de CI.
