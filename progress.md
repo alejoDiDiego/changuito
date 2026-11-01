@@ -4,7 +4,7 @@
 
 **Last Updated:** 2026-11-01 (America/Buenos_Aires)
 **Current Objective:** Cerrar SETUP-001; no iniciar otra feature sin solicitud.
-**Active Feature:** SETUP-001 `in-progress` (aceptación técnica 1-4 PASS; bloqueo real de transición `done` en el gate runner); otras 65 entradas `not-started`.
+**Active Feature:** SETUP-001 `in-progress` (regresión de transición corregida por Builder; aceptación exclusiva del siguiente Checker); otras 65 entradas `not-started`.
 
 ## What's Done
 
@@ -159,3 +159,13 @@ Al cambiar SETUP-001 a `done`, el caso negativo `t.features[1].status='in-progre
 ### Estado final y publicación
 
 SETUP-001 **`in-progress`**; otras65 **`not-started`**; ninguna otra activa ni `done`. Aceptación técnica 1-4 PASS, pero la transición de estado no es válida con los gates actuales. No iniciar otra feature ni crear backlog alternativo. Tras corregir el caso negativo y repetir entrypoint/CI, la aceptación podrá registrarse. Esta ronda publica SOLO `feature_list.json`, `progress.md` y `session-handoff.md`; el CI del nuevo SHA de estado se consulta por API y se registra como evidencia local (`.cache/checker2-state-actions.json`) sin re-publicar, para evitar un bucle de commits de CI.
+
+## Builder — regresión de fixtures de transición — 2026-11-01
+
+- Alcance único SETUP-001, sin delegación. Startup limpio HEAD92260909cbc3d1bb3b6aff1f386220a71a143a4b. No se cambió validator, runtime, catálogo, locks, Docker ni workflow; ninguna feature adicional activada.
+- RED real: nueva regresión con bases SETUP in-progress/done sobre la fixture anterior, `node --test tests/runner/tracker.test.mjs` exit1 `Missing expected exception` en base done. Log privado `.cache/builder3-red.log`; el validator aceptaba correctamente done+F-001 activo, la precondición negativa era errónea.
+- GREEN/refactor: smoke del tracker real solo lectura; factory sintética autocontenida de66 IDs, pointers coherentes, estados/deps/evidence ficticios explícitos. Negativos dobleactiva y dependencia insatisfecha fijan sus propias precondiciones desde ambas bases y comprueban mensajes específicos; done+F-001 activo es positivo válido. Conservados negativos de identidad/schema/contratos/pointers/reorder/ciclos/blocker/evidence incompleta. Lookup por ID donde importa identidad; no se deriva la fixture del backlog mutable.
+- Rerun serial: tracker6/6, runner11/11, harness exit0; auditoría100/100 (solo estructural). PostgreSQL test dedicado iniciado explícitamente; preparación nativa APP_ENV=testing y preparación Compose exit0 Nothing to migrate. Ambos entrypoints completos exit0:14 gates, runner11/11, Chromium2/2 cada uno, sin instalar ni construir imágenes. Logs privados `.cache/builder3-native-utf8.log` y `.cache/builder3-compose-utf8.log`.
+- Cleanup comprobado: down --remove-orphans exit0 SIN -v/prune;7 volúmenes preservados, sin contenedores propios; puertos8000/18080/8011/13714/5173/55432/55433/8025/1025 libres, hot/config cache ausentes. Cache Playwright privada y GC deshabilitado; sin installs globales ni servicios ajenos. Jobs locales recogidos.
+- Publicación autorizada: solo test y estos3 artefactos de estado/evidencia, revisión explícita diff/secretos, fetch y ancestor guard antes de commit/push main sin force. El SHA exacto resultante y su Actions push native+compose se verifican después de publicar y quedan en `.cache/builder3-actions-result.json` y logs privados `.cache/builder3-ci-native.log`/`.cache/builder3-ci-compose.log`; no atribuirles CI de SHAs anteriores ni crear commits recursivos para registrar el propio SHA.
+- **Entrega al próximo único escritor Checker:** SETUP sigue in-progress y65 not-started; NO done por Builder. Comprobar aceptación y transición independientemente antes de escribir estado/publicar su SHA. No iniciar otra feature. Se preservan las limitaciones históricas: ausencia de RED inicial HTTP/SSR/DB e incidente GC anterior, sin falsearlas.
