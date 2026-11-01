@@ -3,8 +3,8 @@
 ## Current State
 
 **Last Updated:** 2026-11-01 (America/Buenos_Aires)
-**Current Objective:** Cerrar SETUP-001; no iniciar otra feature sin solicitud.
-**Active Feature:** SETUP-001 `in-progress` (regresión de transición corregida por Builder; aceptación exclusiva del siguiente Checker); otras 65 entradas `not-started`.
+**Current Objective:** SETUP-001 aceptada y `done`; no iniciar otra feature sin solicitud.
+**Active Feature:** Ninguna activa. SETUP-001 `done`; otras 65 entradas `not-started`.
 
 ## What's Done
 
@@ -169,3 +169,29 @@ SETUP-001 **`in-progress`**; otras65 **`not-started`**; ninguna otra activa ni `
 - Cleanup comprobado: down --remove-orphans exit0 SIN -v/prune;7 volúmenes preservados, sin contenedores propios; puertos8000/18080/8011/13714/5173/55432/55433/8025/1025 libres, hot/config cache ausentes. Cache Playwright privada y GC deshabilitado; sin installs globales ni servicios ajenos. Jobs locales recogidos.
 - Publicación autorizada: solo test y estos3 artefactos de estado/evidencia, revisión explícita diff/secretos, fetch y ancestor guard antes de commit/push main sin force. El SHA exacto resultante y su Actions push native+compose se verifican después de publicar y quedan en `.cache/builder3-actions-result.json` y logs privados `.cache/builder3-ci-native.log`/`.cache/builder3-ci-compose.log`; no atribuirles CI de SHAs anteriores ni crear commits recursivos para registrar el propio SHA.
 - **Entrega al próximo único escritor Checker:** SETUP sigue in-progress y65 not-started; NO done por Builder. Comprobar aceptación y transición independientemente antes de escribir estado/publicar su SHA. No iniciar otra feature. Se preservan las limitaciones históricas: ausencia de RED inicial HTTP/SSR/DB e incidente GC anterior, sin falsearlas.
+
+## Checker independiente — aceptación final SETUP-001 — 2026-11-01 (America/Buenos_Aires)
+
+**Alcance:** revisión fresca, sin delegar ni editar implementación, dependencias, locks, Docker, workflow ni validator. Único escritor de estado/evidencia. Solo PostgreSQL test aislado (127.0.0.1:55433/volumen `test-db`) y cache Playwright privada `.cache/ms-playwright`; sin instalaciones, datos reales ni servicios ajenos.
+
+### Resultado por aceptación
+
+| Criterio | Resultado | Evidencia independiente |
+|---|---|---|
+| 1. Compatibilidad y lockfiles | **PASS** | `composer validate --strict`, `composer check-platform-reqs`, `composer install --dry-run --no-scripts`, `npm ci --dry-run` y `npm ls --depth=0` exit0. Laravel13.39.0/PHP8.5.10, Inertia PHP3.6.0, React19.3.1/InertiaJS3.10.0, Vite8.3.5, TS5.9.3, Tailwind4.3.3. |
+| 2. Inicio nativo/Compose + PostgreSQL test aislado | **PASS** | Preparación explícita `Nothing to migrate` exit0 nativa y Compose quality. Playwright nativo inicia PHP/SSR reales y consulta PostgreSQL test; Compose real `app/web/ssr/worker/mailpit` saludables, `/`, `/bootstrap/check`, `/up` y Mailpit HTTP200 con SSR (`data-server-rendered`, Changuito, Entorno técnico, Pantalla inicio/verificación). DB test 4 tablas/1 migración sin cambios. |
+| 3. Gates reales y GitHub Actions | **PASS** | 14/14 gates exit0 nativo y Compose quality; runner11/11, Pest Unit3/6, Feature2/16, Architecture2/13, Pint28, Larastan8, ESLint/TS, builds cliente/SSR, Chromium2/2 en ambos. CI del SHA exacto f6ddba894b250eac245222fe62d16f24e36e9983: run41281921930 COMPLETED/SUCCESS, jobs native124775398444 y compose124775398292 SUCCESS; logs remotos de ambos con14 gates, `All required application gates executed successfully` y Chromium2. |
+| 4. Entrypoint fail-closed, sin instalar/migrar | **PASS** | `node scripts/verify-harness.mjs --application` ejecuta 14 gates y falla si falta alguno; `DB_DATABASE=changuito_dev` y `DB_URL` no seguro exit1 antes de gates (`Unsafe test environment`); no hay install/migrate en el entrypoint; preparación test explícita separada. |
+
+### Transición y negativos de contrato
+
+- Tracker real `in-progress` y `done`: `node scripts/verify-harness.mjs` exit0 en ambos. Clon aislado de `f6ddba8`: tracker6/6 y runner11/11; `done` y progresión `done`+F-001 `in-progress` válidos.
+- Negativos con precondiciones explícitas: SETUP `not-started`+F-001 activo falla `Unmet dependency: F-001`; doble activa falla `Only one active feature allowed`. El caso anterior que rompía al marcar `done` ya no existe; validator sin cambios.
+- Las otras65 entradas no cambiaron respecto de `9226090`; SETUP solo pasó a `done` y añadió evidence. Sin documento de semillas retirado (`git grep` 0), sin otra feature/backlog.
+
+### Rerun real con estado DONE y limpieza
+
+- Nativo: `APP_ENV=testing php scripts/prepare-test.php` exit0; 14/14 gates exit0 con SETUP `done`; log privado `.cache/checker4-native.log`.
+- Compose: `docker compose run --rm quality php scripts/prepare-test.php` exit0; 14/14 gates exit0; log privado `.cache/checker4-compose.log`.
+- `docker compose down --remove-orphans` exit0 sin `-v`/prune; 7 volúmenes conservados, sin contenedores/red propios; puertos8000/18080/8011/13714/5173/55432/55433/8025/1025 libres; `public/hot` y `bootstrap/cache/config.php` ausentes; procesos propios recogidos.
+- **Estado:** SETUP-001 `done`; otras65 `not-started`; ninguna otra activa. Sin publicar logs privados, secretos ni cache. El SHA de estado y su CI native+compose se consultan por API después del push y se guardan localmente en `.cache/checker4-actions-result.json`, sin commit recursivo. Limitaciones históricas preservadas: ausencia de RED inicial HTTP/SSR/DB e incidente GC anterior.

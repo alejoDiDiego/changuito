@@ -9,7 +9,7 @@
       "source": "docs/architecture/ARCHITECTURE.md",
       "description": "Preparar el stack acordado sin implementar todo el MVP.",
       "dependencies": [],
-      "status": "in-progress",
+      "status": "done",
       "acceptance": [
         "Validar compatibilidad Laravel/PHP, Inertia/React y fijar dependencias en lockfiles.",
         "Documentar y comprobar inicio nativo y Docker Compose con PostgreSQL aislado para tests.",
@@ -17,6 +17,12 @@
         "Reemplazar el bloqueo --application del verificador por un entrypoint que ejecute todos los gates reales y falle si falta alguno; sin instalar dependencias ni migrar datos reales implícitamente."
       ],
       "evidence": [
+        {
+          "date": "2026-11-01",
+          "environment": "Checker independiente; Windows 11/PowerShell + Docker Compose quality (Debian); PHP 8.5.10/Composer 2.10.3/Node 24.15.0/npm 12.0.2; PostgreSQL 18.6 test aislado 127.0.0.1:55433/volumen test-db; cache Playwright privada .cache/ms-playwright, GC deshabilitado",
+          "command": "node scripts/verify-harness.mjs; node --test tests/runner/*.test.mjs; composer validate --strict; composer check-platform-reqs; composer install --dry-run --no-scripts; npm ci --dry-run; npm ls --depth=0; docker compose up -d --wait postgres-test; APP_ENV=testing php scripts/prepare-test.php; node scripts/verify-harness.mjs --application; docker compose run --rm quality php scripts/prepare-test.php; docker compose run --rm quality node scripts/verify-harness.mjs --application; DB_DATABASE=changuito_dev node scripts/verify-harness.mjs --application; DB_URL=postgres://invalid.invalid/changuito_test node scripts/verify-harness.mjs --application; docker compose up -d --wait --wait-timeout 180 app web ssr worker mailpit; fetch /, /bootstrap/check, /up y :8025; GET actions/runs/41281921930 + jobs + logs; docker compose down --remove-orphans",
+          "result": "Aceptación 1-4 PASS. Tracker real in-progress y done válidos; clon aislado: tracker6/6 y runner11/11, done y progresión done+F-001 in-progress válidos, negativos con mensajes exactos 'Unmet dependency: F-001' y 'Only one active feature allowed'. Locks/platform/dry-runs exit0. Nativo y Compose quality con SETUP done: preparación explícita 'Nothing to migrate' exit0; 14/14 gates exit0 en cada uno; runner11/11, Pest Unit3/6, Feature2/16, Architecture2/13, Pint28, Larastan8, ESLint/TS, builds cliente/SSR, Playwright Chromium2/2. DB test 4 tablas/1 migración sin cambios; overrides DB_DATABASE y DB_URL exit1 antes de gates. Compose web real HTTP200 con SSR (data-server-rendered, Changuito, Entorno técnico, Pantalla inicio/verificación). CI de implementación f6ddba894b250eac245222fe62d16f24e36e9983: run https://github.com/alejoDiDiego/changuito/actions/runs/41281921930 COMPLETED/SUCCESS; native 124775398444 y compose 124775398292 SUCCESS; jobs y logs de AMBOS 14 gates y Chromium 2 passed. SETUP-001 marcado done; 65 not-started; sin otra activa. El SHA de estado y su CI se observan por API y se registran localmente en .cache/checker4-actions-result.json, sin commit recursivo. Logs privados .cache/checker4-native.log, checker4-compose.log y checker4-*.log; no publicados. Limitaciones históricas (ausencia de RED inicial HTTP/SSR/DB e incidente GC) preservadas."
+        },
         {
           "date": "2026-11-01",
           "environment": "Builder único; Windows PowerShell PHP8.5.10/Node24.15/npm12 y Compose quality existente; PostgreSQL test dedicado; cache Playwright privada, GC deshabilitado",
